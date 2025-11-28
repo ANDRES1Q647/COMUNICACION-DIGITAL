@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lector RS232 Web</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #111; color: #eee; padding: 20px; }
+  button { padding: 12px 20px; border: none; background: #4CAF50; color: white; font-size: 16px; cursor: pointer; border-radius: 8px; }
+  button:hover { background: #45a049; }
+  #datos { margin-top: 20px; white-space: pre-line; background: #222; padding: 15px; border-radius: 10px; }
+</style>
+</head>
+<body>
+<h1>Lector RS232 desde Navegador</h1>
+<p>Conéctate al puerto serial RS232 usando la API Web Serial (solo Chrome/Edge).</p>
+<button id="btnConectar">Conectar Puerto Serial</button>
+
+<div id="datos">Esperando datos...</div>
+
+<script>
+const boton = document.getElementById("btnConectar");
+const salida = document.getElementById("datos");
+
+boton.addEventListener("click", async () => {
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600 });
+
+    const decoder = new TextDecoderStream();
+    const inputDone = port.readable.pipeTo(decoder.writable);
+    const inputStream = decoder.readable.getReader();
+
+    salida.textContent = "📡 Conectado. Leyendo datos...";
+
+    while (true) {
+      const { value, done } = await inputStream.read();
+      if (done) break;
+      if (value) {
+        salida.textContent = value;
+      }
+    }
+  } catch (error) {
+    salida.textContent = "❌ Error: " + error;
+  }
+});
+  // --- Guardado en CSV ---
+  let csvData = "lat,lon,sat,temp,hum,ax,ay,az,gx,gy,gz,lap
+";
+
+  function descargarCSV() {
+    const blob = new Blob([csvData], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "datos_rs232.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Botón para guardar CSV
+  const btnCSV = document.createElement("button");
+  btnCSV.textContent = "Guardar CSV";
+  btnCSV.style.marginLeft = "10px";
+  document.body.insertBefore(btnCSV, document.getElementById("datos"));
+
+  btnCSV.addEventListener("click", descargarCSV);
+
+  // Extraer datos y agregarlos al CSV
+  function procesarLinea(linea) {
+    const partes = linea.split(";");
+    if (partes.length >= 12) {
+      csvData += partes.join(",") + "
+";
+    }
+  }
+
+  // Reemplazar donde se muestra el texto
+  boton.addEventListener("click", async () => {
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+
+      const decoder = new TextDecoderStream();
+      const inputDone = port.readable.pipeTo(decoder.writable);
+      const inputStream = decoder.readable.getReader();
+
+      salida.textContent = "📡 Conectado. Leyendo datos...";
+
+      while (true) {
+        const { value, done } = await inputStream.read();
+        if (done) break;
+        if (value) {
+          salida.textContent = value;
+          procesarLinea(value);
+        }
+      }
+    } catch (error) {
+      salida.textContent = "❌ Error: " + error;
+    }
+  });
+</script>
+</body>
+</html>
